@@ -97,7 +97,7 @@ function parseAll(tokens) {
 
                         const abstractionToken = {
                             type: ABSTRACTION,
-                            formalParameter: lastFormalParameter,
+                            formalParameter: { type: BASIC.VARIABLE, name: lastFormalParameter },
                             body: parse(i + 1, endOfBlock[i])
                         }
 
@@ -111,7 +111,7 @@ function parseAll(tokens) {
                         for (let i = formalParameters.length - 2; i >= 0; i--) {
                             currentAbstraction = {
                                 type: ABSTRACTION,
-                                formalParameter: formalParameters[i],
+                                formalParameter: { type: BASIC.VARIABLE, name: formalParameters[i] },
                                 body: currentAbstraction
                             }
                         }
@@ -196,4 +196,64 @@ function tokenize(str) {
 
 function handleInput(str) {
     return parseAll(tokenize(str))
+}
+
+/**
+ * ctx - a 2d canvas context for an HTML <canvas> element
+ * rootNode - an object returned by `parseAll`
+ * x, y - the top left corner of the bounding box which will contain the drawing
+ * width - the horizontal width of the bounding box which will contain the drawing
+ */
+function displayParseTree(ctx, rootNode, x, y, width) {
+    const midX = (x + width / 2);
+    const outerRadius = 20
+    const verticalGap = 5
+    
+    switch (rootNode.type) {
+        
+        case APPLICATION:
+            const innerRadius = 8
+
+            // Draw a circle together with two minicircles inside, representing application
+            ctx.beginPath()
+            ctx.fillStyle = "lightblue"
+            ctx.arc(midX, y, outerRadius, 0, 2 * Math.PI)
+            ctx.fill()
+
+            ctx.beginPath()
+            ctx.fillStyle = "white"
+            ctx.arc(midX - outerRadius / 4, y, innerRadius, 2 * Math.PI)
+            ctx.fill()
+
+            ctx.beginPath()
+            ctx.strokeStyle = "white"
+            ctx.arc(midX + outerRadius / 4, y, innerRadius, 2 * Math.PI)
+            ctx.stroke()
+
+            // Draw the two children
+            displayParseTree(ctx, rootNode.abstraction, x, y + 2 * outerRadius + verticalGap, width / 2)
+            displayParseTree(ctx, rootNode.argument, midX, y + 2 * outerRadius + verticalGap, width / 2) 
+            break
+
+        case ABSTRACTION:
+            ctx.beginPath()
+            ctx.fillStyle = "orange"
+            ctx.arc(midX, y, outerRadius, 0, 2 * Math.PI)
+            ctx.fill()
+
+            displayParseTree(ctx, rootNode.formalParameter, x, y + outerRadius + verticalGap, width / 2)
+            displayParseTree(ctx, rootNode.body, midX, y + outerRadius + verticalGap, width / 2)
+            break
+
+        default:
+            ctx.beginPath()
+            ctx.fillStyle = "black"
+            ctx.arc(midX, y, outerRadius, 0, 2 * Math.PI)
+            ctx.fill()
+
+            ctx.beginPath()
+            ctx.fillStyle = "white"
+            ctx.fillText(rootNode.name, midX, y)
+            ctx.fill()
+    }
 }
