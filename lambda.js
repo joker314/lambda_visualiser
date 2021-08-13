@@ -69,6 +69,7 @@ function parseAll(tokens) {
     return parse(0, tokens.length)
 
     function parse(start, end) {
+        console.log("Parsing", tokens.slice(start, end))
         const parsedTokens = []
 
         let formalParameters = []
@@ -78,6 +79,11 @@ function parseAll(tokens) {
             const token = tokens[i]
 
             switch (token.type) {
+                case BASIC.OPENING_BRACKET:
+                    parsedTokens.push(parse(i + 1, openingToClosing[i]))
+                    i = openingToClosing[i] + 1
+                    break
+
                 case BASIC.LAMBDA:
                     if (inLambda) {
                         throw new Error(`New lambda started at ${i} without dot-terminating previous lambda`)
@@ -132,7 +138,7 @@ function parseAll(tokens) {
                     break;
 
                 default:
-                   throw new Error(`Unexpected token of type ${token.type} at ${i}`)
+                   throw new Error(`Unexpected token of type ${token.type.toString()} at ${i}`)
             }
         }
 
@@ -222,12 +228,12 @@ function displayParseTree(ctx, rootNode, x, y, width) {
 
             ctx.beginPath()
             ctx.fillStyle = "white"
-            ctx.arc(midX - outerRadius / 4, y, innerRadius, 2 * Math.PI)
+            ctx.arc(midX - outerRadius / 4, y, innerRadius, 0, 2 * Math.PI)
             ctx.fill()
 
             ctx.beginPath()
             ctx.strokeStyle = "white"
-            ctx.arc(midX + outerRadius / 4, y, innerRadius, 2 * Math.PI)
+            ctx.arc(midX + outerRadius / 4, y, innerRadius, 0, 2 * Math.PI)
             ctx.stroke()
 
             // Draw the two children
