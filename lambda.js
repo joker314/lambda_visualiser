@@ -46,6 +46,7 @@ function getBracketPairs(tokens) {
 
     for (let i = tokens.length - 1; i >= 0; i--) {
         endOfBlock.push(closingBrackets.at(-1))
+        const token = tokens[i]
 
         switch (token.type) {
             case BASIC.CLOSING_BRACKET:
@@ -65,6 +66,7 @@ function getBracketPairs(tokens) {
 
 function parseAll(tokens) {
     const { openingToClosing, closingToOpening, endOfBlock } = getBracketPairs(tokens)
+    return parse(0, tokens.length)
 
     function parse(start, end) {
         const parsedTokens = []
@@ -188,6 +190,8 @@ function tokenize(str) {
 
         }
     }
+
+    return tokens
 }
 
 function handleInput(str) {
