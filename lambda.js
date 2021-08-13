@@ -143,7 +143,7 @@ function parseAll(tokens) {
         // Now we can move left-to-right collapsing everything into an application
         let currentApplication = parsedTokens[0]
 
-        tokens.forEach((token, i) => {
+        parsedTokens.forEach((token, i) => {
             if (i === 0) {
                 // Already handled as initial value of `currentApplication`
                 return;
