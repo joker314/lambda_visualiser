@@ -69,7 +69,7 @@ function parseAll(tokens) {
     return parse(0, tokens.length)
 
     function parse(start, end) {
-        console.log("Parsing", tokens.slice(start, end))
+        console.log("Parsing", tokens.slice(start, end), "from", start, "to", end)
         const parsedTokens = []
 
         let formalParameters = []
@@ -124,6 +124,9 @@ function parseAll(tokens) {
 
                         parsedTokens.push(currentAbstraction)
                     }
+
+                    i = endOfBlock[i] + 1
+                    inLambda = false
 
                     break;
 
