@@ -144,11 +144,11 @@ function parseAll(tokens) {
         tokens.forEach((token, i) => {
             if (i === 0) {
                 // Already handled as initial value of `currentApplication`
-                continue;
+                return;
             }
 
             currentApplication = {
-                type: APPLICATION
+                type: APPLICATION,
                 abstraction: currentApplication,
                 argument: token
             }
