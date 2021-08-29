@@ -217,16 +217,17 @@ function handleReduction(rootNode, redex, logEl) {
 
     // Finally, re-render the tree and simplified output
     render(rootNode)
-    redex.HTMLElement.classList.add('highlighted')
+    // redex.HTMLElement.classList.add('highlighted')
 }
 
 function deepClone(rootNode) {
-    console.log("Deep cloning", rootNode)
+    if (rootNode === null) return;
+
     const newRootNode = {}
 
     for (let key in rootNode) {
         if (key === HTMLElement) continue;
-        if (typeof rootNode[key] === 'object') {
+        if (typeof rootNode[key] === 'object' && rootNode.hasOwnProperty(key)) {
             newRootNode[key] = deepClone(rootNode[key])
         } else {
             newRootNode[key] = rootNode[key]
@@ -312,6 +313,7 @@ function htmlify(rootNode) {
 
         const rightBracketLambda = makeSpan("right-bracket-lambda")
         const rightBracketArgument = makeSpan("right-bracket-argument")
+
 
         leftBracketLambda.textContent = leftBracketArgument.textContent = "("
         rightBracketLambda.textContent = rightBracketArgument.textContent = ")"
