@@ -1,0 +1,20 @@
+<html>
+    <head>
+        <title>Lambda visualiser</title>
+    </head>
+    <body>
+        <input oninput="render(this.value);" />
+        <canvas id="c" width="600" height="600">
+
+        </canvas>
+        <script src="./lambda.js"></script>
+        <script>
+            const canvas = document.querySelector("#c");
+            const ctx = canvas.getContext("2d");
+            function render(str) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                displayParseTree(ctx, handleInput(str), 0, 20, canvas.width);
+            }
+        </script>
+    </body>
+</html>
