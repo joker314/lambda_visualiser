@@ -192,6 +192,73 @@ function leftmostInnermost(rootNode) {
     return null;
 }
 
+function handleReduction(rootNode, redex, logEl) {
+    // Now, make a log of what the reduction was by cloning the current HTML structure
+    // The `true` parameter means the cloning is deep
+    console.log("Doing the appending now...")
+    const historyEl = document.createElement("DIV")
+    historyEl.appendChild(rootNode.HTMLElement.cloneNode(true))
+    logEl.appendChild(historyEl)
+
+    // Unhighlight the pre-reduction appearance of the redex
+    unhighlightRedex(redex)
+
+    // Perform the actual beta reduction!
+    const reductionResult = betaReduce(redex)
+
+    // Clear the old redex object and add the new one (TODO: this is hacky - this trick allows us
+    // to have all references to the redex now point to the reduction result -- it would be better
+    // to instead update all the references and create a new object)
+    for (let key in redex) {
+        delete redex[key]
+    }
+
+    Object.assign(redex, reductionResult)
+
+    // Finally, re-render the tree and simplified output
+    render(rootNode)
+    redex.HTMLElement.classList.add('highlighted')
+}
+
+function deepClone(rootNode) {
+    console.log("Deep cloning", rootNode)
+    const newRootNode = {}
+
+    for (let key in rootNode) {
+        if (key === HTMLElement) continue;
+        if (typeof rootNode[key] === 'object') {
+            newRootNode[key] = deepClone(rootNode[key])
+        } else {
+            newRootNode[key] = rootNode[key]
+        }
+    }
+
+    return newRootNode
+}
+
+function betaReduce(redex) {
+    // TODO: consider keeping a reference to the parent instead, to more easily mutate the rootNode
+
+    function substitute(rootNode, name, replacement) {
+        if (rootNode.type === BASIC.VARIABLE && rootNode.name === name) {
+            return deepClone(replacement)
+        }
+
+        if (rootNode.type === APPLICATION) {
+            rootNode.abstraction = substitute(rootNode.abstraction, name, replacement)
+            rootNode.argument = substitute(rootNode.argument, name, replacement)
+        }
+
+        if (rootNode.type === ABSTRACTION) {
+            rootNode.body = substitute(rootNode.body, name, replacement)
+        }
+
+        return rootNode
+    }
+
+    return substitute(redex.abstraction.body, redex.abstraction.formalParameter.name, redex.argument) 
+}
+
 function parenNeeded(rootNode) {
     if (rootNode.type === ABSTRACTION) {
         // Lambdas will extend as far right as possible.

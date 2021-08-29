@@ -27,7 +27,8 @@
         </style>
     </head>
     <body>
-        <input oninput="render(this.value);" />
+        <input oninput="removeChildren(logEl); newRootNode(this.value);" />
+        <div id="logEl"></div>
         <div id="htmlout"></div>
         <button id="no-eval">Normal order evaluate 1 step</button>
         <button id="ao-eval">Applicactive order evaluate 1 step</button>
@@ -41,6 +42,7 @@
             const htmlOut = document.querySelector("#htmlout")
             const NOButton = document.querySelector("#no-eval")
             const AOButton = document.querySelector("#ao-eval")
+            const logEl = document.querySelector("#logEl")
 
             let rootNode = null
             let AORedex = null
@@ -52,10 +54,16 @@
                 }
             }
 
-            function render(str) {
+            function newRootNode(str) {
                 rootNode = handleInput(str)
+                render(rootNode)
+            }
+
+            function render(rootNode) {
                 AORedex = leftmostInnermost(rootNode)
                 NORedex = leftmostOutermost(rootNode)
+
+                AOButton.disabled = NOButton.disabled = !AORedex
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 displayParseTree(ctx, rootNode, 0, 20, canvas.width);
@@ -88,9 +96,11 @@
 
             NOButton.addEventListener("mouseover", () => { highlightRedex(NORedex) })
             NOButton.addEventListener("mouseout", () => { unhighlightRedex(NORedex) })
+            NOButton.addEventListener("click", () => { handleReduction(rootNode, NORedex, logEl) })
 
             AOButton.addEventListener("mouseover", () => { highlightRedex(AORedex) })
             AOButton.addEventListener("mouseout", () => { unhighlightRedex(AORedex) })
+            AOButton.addEventListener("click", () => { handleReduction(rootNode, AORedex, logEl) })
         </script>
     </body>
 </html>
