@@ -1,11 +1,37 @@
 <html>
     <head>
         <title>Lambda visualiser</title>
+        <style>
+            .highlighted {
+                color: hotpink;
+            }
+
+            body {
+                font-size: 25px;
+            }
+
+            canvas {
+                float: right;
+                border: 1px solid black;
+            }
+
+            .abstraction-highlighted {
+                background: #fed8b1;
+                color: brown;
+            }
+
+            .argument-highlighted {
+                background: lightblue;
+                color: blue;
+            }
+        </style>
     </head>
     <body>
         <input oninput="render(this.value);" />
         <div id="htmlout"></div>
-        <canvas id="c" width="600" height="600">
+        <button id="no-eval">Normal order evaluate 1 step</button>
+        <button id="ao-eval">Applicactive order evaluate 1 step</button>
+        <canvas id="c" width="600" height="600"> 
 
         </canvas>
         <script src="./lambda.js"></script>
@@ -13,6 +39,12 @@
             const canvas = document.querySelector("#c");
             const ctx = canvas.getContext("2d");
             const htmlOut = document.querySelector("#htmlout")
+            const NOButton = document.querySelector("#no-eval")
+            const AOButton = document.querySelector("#ao-eval")
+
+            let rootNode = null
+            let AORedex = null
+            let NORedex = null
 
             function removeChildren(element) {
                 while (element.firstChild) {
@@ -21,7 +53,10 @@
             }
 
             function render(str) {
-                const rootNode = handleInput(str)
+                rootNode = handleInput(str)
+                AORedex = leftmostInnermost(rootNode)
+                NORedex = leftmostOutermost(rootNode)
+
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 displayParseTree(ctx, rootNode, 0, 20, canvas.width);
 
@@ -29,6 +64,33 @@
                 console.log("Appending", htmlify(rootNode))
                 htmlOut.appendChild(htmlify(rootNode))
             }
+
+            function highlightRedex(redex) {
+                redex.abstraction.HTMLElement.classList.add('abstraction-highlighted')
+                redex.argument.HTMLElement.classList.add('argument-highlighted')
+            }
+
+            function unhighlightRedex(redex) {
+                redex.abstraction.HTMLElement.classList.remove('abstraction-highlighted')
+                redex.argument.HTMLElement.classList.remove('argument-highlighted')
+            }
+
+            canvas.addEventListener("mousemove", function handleMouseMove(event) {
+                if (!rootNode) return;
+                // Get the canvas's top left corner
+                const {x, y} = canvas.getBoundingClientRect()
+                
+                //ctx.fillStyle = 'green'
+                //ctx.fillRect(event.clientX - x, event.clientY - y, 20, 20)
+
+                canvasMouse(event.clientX - x, event.clientY - y, rootNode)
+            })
+
+            NOButton.addEventListener("mouseover", () => { highlightRedex(NORedex) })
+            NOButton.addEventListener("mouseout", () => { unhighlightRedex(NORedex) })
+
+            AOButton.addEventListener("mouseover", () => { highlightRedex(AORedex) })
+            AOButton.addEventListener("mouseout", () => { unhighlightRedex(AORedex) })
         </script>
     </body>
 </html>

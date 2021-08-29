@@ -83,7 +83,7 @@ function parseAll(tokens) {
             switch (token.type) {
                 case BASIC.OPENING_BRACKET:
                     parsedTokens.push(parse(i + 1, openingToClosing[i]))
-                    i = openingToClosing[i] + 1
+                    i = openingToClosing[i]
                     break
 
                 case BASIC.LAMBDA:
@@ -127,7 +127,7 @@ function parseAll(tokens) {
                         parsedTokens.push(currentAbstraction)
                     }
 
-                    i = endOfBlock[i] + 1
+                    i = endOfBlock[i]
                     inLambda = false
 
                     break;
@@ -170,6 +170,26 @@ function parseAll(tokens) {
 
         return currentApplication
     }
+}
+
+function leftmostOutermost(rootNode) {
+    if (rootNode.type === APPLICATION && rootNode.abstraction.type === ABSTRACTION) {
+        return rootNode
+    }
+
+    if (rootNode.type === APPLICATION) return leftmostOutermost(rootNode.abstraction) || leftmostOutermost(rootNode.argument);
+    if (rootNode.type === ABSTRACTION) return leftmostOutermost(rootNode.body)
+    return null;
+}
+
+function leftmostInnermost(rootNode) {
+    if (rootNode.type === APPLICATION && rootNode.abstraction.type === ABSTRACTION) {
+        return leftmostInnermost(rootNode.abstraction) || leftmostInnermost(rootNode.argument) || rootNode
+    }
+
+    if (rootNode.type === ABSTRACTION) return leftmostInnermost(rootNode.body);
+    if (rootNode.type === APPLICATION) return leftmostInnermost(rootNode.abstraction) || leftmostInnermost(rootNode.argument);
+    return null;
 }
 
 function parenNeeded(rootNode) {
@@ -344,5 +364,36 @@ function displayParseTree(ctx, rootNode, x, y, width) {
             ctx.fillStyle = "white"
             ctx.fillText(rootNode.name, midX, y)
             ctx.fill()
+    }
+
+    rootNode.canvasX = midX
+    rootNode.canvasY = y
+    rootNode.canvasRadius = outerRadius
+}
+
+function canvasMouse(x, y, rootNode) {
+    // TODO: in principle, we should know which half of the tree the relevant
+    // node will be so only need to search O(log n) nodes rather than O(n) nodes
+    findIntersection(rootNode)
+
+
+    function findIntersection(node) {
+        if (!node) return;
+
+        if (x < node.canvasX + node.canvasRadius &&
+            x > node.canvasX - node.canvasRadius &&
+            y < node.canvasY + node.canvasRadius &&
+            y > node.canvasY - node.canvasRadius
+        ) {
+            node.HTMLElement.classList.add('highlighted')
+            console.log("Found!")
+        } else {
+            node.HTMLElement.classList.remove('highlighted')
+            
+            findIntersection(node.body)
+            findIntersection(node.abstraction)
+            findIntersection(node.argument)
+            findIntersection(node.formalParameter)
+        }
     }
 }
