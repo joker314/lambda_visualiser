@@ -6,6 +6,8 @@ const BASIC = {
     DOT: Symbol("DOT")
 }
 
+const LAMBDA_CHAR = "\u03bb"
+
 const ABSTRACTION = Symbol("ABSTRACTION")
 const APPLICATION = Symbol("APPLICATION")
 
@@ -150,6 +152,7 @@ function parseAll(tokens) {
         }
 
         // Now we can move left-to-right collapsing everything into an application
+        console.log("Parsed tokens are", parsedTokens)
         let currentApplication = parsedTokens[0]
 
         parsedTokens.forEach((token, i) => {
@@ -169,13 +172,90 @@ function parseAll(tokens) {
     }
 }
 
+function parenNeeded(rootNode) {
+    if (rootNode.type === ABSTRACTION) {
+        // Lambdas will extend as far right as possible.
+        return true;
+    } else if (rootNode.type === APPLICATION) {
+        return parenNeeded(rootNode.argument)
+    } else {
+        return false;
+    }
+}
+
+function makeSpan(classNameSuffix) {
+    const span = document.createElement("SPAN")
+    span.classList.add("lambda-" + classNameSuffix)
+    return span 
+}
+
+function htmlify(rootNode) {
+    const span = document.createElement("SPAN")
+
+    if (rootNode.type === ABSTRACTION) {
+        span.classList.add("abstraction")
+
+        const formalParameter = makeSpan("formal-parameter")
+        formalParameter.appendChild(htmlify(rootNode.formalParameter))
+
+        const abstractionBody = makeSpan("body")
+        abstractionBody.appendChild(htmlify(rootNode.body))
+
+        const lambdaChar = makeSpan("lambda-char")
+        lambdaChar.textContent = LAMBDA_CHAR
+
+        const dotChar = makeSpan("dot-char")
+        dotChar.textContent = "."
+
+        span.appendChild(lambdaChar)
+        span.appendChild(formalParameter)
+        span.appendChild(dotChar)
+        span.appendChild(abstractionBody)
+    } else if (rootNode.type === APPLICATION) {
+        span.classList.add("lambda-application")
+
+        const leftSide = makeSpan("left-side")
+        leftSide.appendChild(htmlify(rootNode.abstraction))
+
+        const rightSide = makeSpan("right-side")
+        rightSide.appendChild(htmlify(rootNode.argument))
+
+        const leftBracketLambda = makeSpan("left-bracket-lambda")
+        const leftBracketArgument = makeSpan("left-bracket-argument")
+
+        const rightBracketLambda = makeSpan("right-bracket-lambda")
+        const rightBracketArgument = makeSpan("right-bracket-argument")
+
+        leftBracketLambda.textContent = leftBracketArgument.textContent = "("
+        rightBracketLambda.textContent = rightBracketArgument.textContent = ")"
+
+
+
+        const isParenNeeded = parenNeeded(rootNode.abstraction)
+        
+        if (isParenNeeded) { span.appendChild(leftBracketLambda) }
+        span.appendChild(leftSide)
+        if (isParenNeeded) { span.appendChild(rightBracketLambda) }
+        
+        if (rootNode.argument.type === APPLICATION) { span.appendChild(leftBracketArgument) }
+        span.appendChild(rightSide)
+        if (rootNode.argument.type === APPLICATION) { span.appendChild(rightBracketArgument) }
+    } else {
+        span.classList.add("lambda-var") // variable OR formal parameter
+        span.textContent = rootNode.name
+    }
+    
+    rootNode.HTMLElement = span
+    return span
+}
+
 function tokenize(str) {
     const tokens = []
 
     for (let i = 0; i < str.length; i++) {
         switch (str[i]) {
             case "\\":
-            case "λ":
+            case LAMBDA_CHAR:
                 tokens.push({ type: BASIC.LAMBDA })
                 break
 

@@ -4,6 +4,7 @@
     </head>
     <body>
         <input oninput="render(this.value);" />
+        <div id="htmlout"></div>
         <canvas id="c" width="600" height="600">
 
         </canvas>
@@ -11,9 +12,22 @@
         <script>
             const canvas = document.querySelector("#c");
             const ctx = canvas.getContext("2d");
+            const htmlOut = document.querySelector("#htmlout")
+
+            function removeChildren(element) {
+                while (element.firstChild) {
+                    element.firstChild.remove()
+                }
+            }
+
             function render(str) {
+                const rootNode = handleInput(str)
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                displayParseTree(ctx, handleInput(str), 0, 20, canvas.width);
+                displayParseTree(ctx, rootNode, 0, 20, canvas.width);
+
+                removeChildren(htmlOut);
+                console.log("Appending", htmlify(rootNode))
+                htmlOut.appendChild(htmlify(rootNode))
             }
         </script>
     </body>
