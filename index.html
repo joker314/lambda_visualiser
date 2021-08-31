@@ -24,11 +24,42 @@
                 background: lightblue;
                 color: blue;
             }
+
+            #alphaconv {
+                background: green;
+                color: white;
+                border: 1px solid black;
+                border-radius: 5px;
+                display: inline-block;
+                padding: 5px;
+                margin: 3px;
+                font-size: 15px;
+                width: 40%;
+                font-family: Arial, sans-serif;
+                display: none;
+            }
+            
+            #alphaconv h3 {
+                margin: 1px;
+                padding: 1px;
+            }
+
+            .visible {
+                display: block;
+            }
         </style>
     </head>
     <body>
         <input oninput="removeChildren(logEl); newRootNode(this.value);" />
         <div id="logEl"></div>
+        <div id="alphaConv">
+            <h3>Alpha conversion</h3>
+            Some of the free variables in the blue component will become captured if they are substituted in the orange component. They need to be renamed, in a process called "alpha conversion".
+            <ul id="alphaConvList">
+
+            </ul>
+            <button>Finish beta reduction</button>
+        </div>
         <div id="htmlout"></div>
         <button id="no-eval">Normal order evaluate 1 step</button>
         <button id="ao-eval">Applicactive order evaluate 1 step</button>
@@ -43,10 +74,14 @@
             const NOButton = document.querySelector("#no-eval")
             const AOButton = document.querySelector("#ao-eval")
             const logEl = document.querySelector("#logEl")
+            const alphaBox = document.querySelector("#alphaConv") 
+            const alphaList = document.querySelector("#alphaConvList") 
 
             let rootNode = null
             let AORedex = null
             let NORedex = null
+
+            let alphaPrompt = false
 
             function removeChildren(element) {
                 while (element.firstChild) {

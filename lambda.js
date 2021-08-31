@@ -172,6 +172,81 @@ function parseAll(tokens) {
     }
 }
 
+function setUnion(setA, setB) {
+    return new Set([...setA, ...setB])
+}
+
+function setButWithout(set, withoutMe) {
+    const smallerSet = new Set(set)
+    smallerSet.delete(withoutMe)
+    return smallerSet
+}
+
+function determineFreeVariables(rootNode) {
+    if (rootNode.type === ABSTRACTION) {
+        return rootNode.freeVariables = setButWithout(determineFreeVariables(rootNode.body))
+    } else if (rootNode.type === APPLICATION) {
+        return rootNode.freeVariables = setUnion(
+            determineFreeVariables(rootNode.abstraction),
+            determineFreeVariables(rootNode.argument)
+        )
+    } else {
+        return rootNode.freeVariables = new Set([rootNode.name])
+    }
+}
+
+/* A node contains a bound variable iff it contains as a subtree a lambda
+ * abstraction which binds that variable. This lets you figure out if you need
+ * to alpha convert before a beta reduction.
+ *
+ * XXX: You can't just check whether or not a variable is in the binders object in order
+ *      to deduce whether or not the variable is free in a subexpression. The only time you
+ *      can do this is when the subexpression is the entire expression. This is since the binder might
+ *      be outside the subexpression. Instead, also make sure that the variable is in the set
+ *      of free variables at the root of the subexpression.
+ *
+ * TODO: Determining the binders of a particular node can be done on a per-need basis (think DP), there
+ *       isn't a strict need to precompute at the start. But this will be efficient enough for now.
+ *
+ * Also, there is much more subtely to alpha conversion than might first appear. Consider \b.b\b.bb. If we
+ * distinguish between formal parameters and variables, and then incorrectly apply alpha conversion to variables
+ * with the same name but bound by different binders, we may end up with \a.a\b.aa. We could treat formal parameters
+ * as variables, in which case alpha-converting b->a would correctly yield \a.a\a.aa.
+ *
+ * One thing I didn't immediately realise is that beta reduction concerns replacing FREE occurances in the body of an
+ * abstraction only. It does not concern replacing bound variables. This means that each variable can only occur once and
+ * all is once again well.
+ *
+ * But notice that it's still possible for the same variable to be bound in multiple abstractions, like this:
+ * (\a. \x.a \x.a)(x).
+ *
+ * And also, it's still possible for this abstraction to exist:
+ * (\a. \x. (a \x. a))(x)
+ *
+ * The best way forward appears to be to find all free instances of the variable being replaced, and then
+ * collecting the binders of each of those variables into a Set structure. Then, each of the members of that
+ * set can be iterated in turn.
+ */
+function determineBoundVariables(rootNode, binders = {}) {
+    const newBinders = {...binders}
+
+    if (rootNode.type === ABSTRACTION) {
+        newBinders[rootNode.formalParameter.name] = rootNode
+    }
+
+    rootNode.binders = newBinders
+
+    // Propogate down the tree
+    if (rootNode.type === ABSTRACTION) {
+        determineBoundVariables(rootNode.body, newBinders)
+    }
+
+    if (rootNode.type === APPLICATION) {
+        determineBoundVariables(rootNode.abstraction, newBinders)
+        determineBoundVariables(rootNode.argument, newBinders)
+    }
+}
+
 function leftmostOutermost(rootNode) {
     if (rootNode.type === APPLICATION && rootNode.abstraction.type === ABSTRACTION) {
         return rootNode
@@ -193,6 +268,8 @@ function leftmostInnermost(rootNode) {
 }
 
 function handleReduction(rootNode, redex, logEl) {
+    // Determine if alpha conversion is needed first
+    if (rootNode.freeVariables.has())
     // Now, make a log of what the reduction was by cloning the current HTML structure
     // The `true` parameter means the cloning is deep
     console.log("Doing the appending now...")
@@ -226,7 +303,10 @@ function deepClone(rootNode) {
     const newRootNode = {}
 
     for (let key in rootNode) {
-        if (key === HTMLElement) continue;
+        // TODO: freeVariables doesn't need to be recomputed each time
+        // (though it does need to be deep cloned in any case)
+        if (key === "HTMLElement" || key === "freeVariables") continue;
+
         if (typeof rootNode[key] === 'object' && rootNode.hasOwnProperty(key)) {
             newRootNode[key] = deepClone(rootNode[key])
         } else {
