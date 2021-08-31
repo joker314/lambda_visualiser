@@ -95,6 +95,9 @@
             }
 
             function render(rootNode) {
+                findFreeVariables(rootNode)
+                findBoundVariables(rootNode)
+
                 AORedex = leftmostInnermost(rootNode)
                 NORedex = leftmostOutermost(rootNode)
 

@@ -182,13 +182,13 @@ function setButWithout(set, withoutMe) {
     return smallerSet
 }
 
-function determineFreeVariables(rootNode) {
+function findFreeVariables(rootNode) {
     if (rootNode.type === ABSTRACTION) {
-        return rootNode.freeVariables = setButWithout(determineFreeVariables(rootNode.body))
+        return rootNode.freeVariables = setButWithout(findFreeVariables(rootNode.body), rootNode.formalParameter.name)
     } else if (rootNode.type === APPLICATION) {
         return rootNode.freeVariables = setUnion(
-            determineFreeVariables(rootNode.abstraction),
-            determineFreeVariables(rootNode.argument)
+            findFreeVariables(rootNode.abstraction),
+            findFreeVariables(rootNode.argument)
         )
     } else {
         return rootNode.freeVariables = new Set([rootNode.name])
@@ -227,7 +227,7 @@ function determineFreeVariables(rootNode) {
  * collecting the binders of each of those variables into a Set structure. Then, each of the members of that
  * set can be iterated in turn.
  */
-function determineBoundVariables(rootNode, binders = {}) {
+function findBoundVariables(rootNode, binders = {}) {
     const newBinders = {...binders}
 
     if (rootNode.type === ABSTRACTION) {
@@ -238,12 +238,68 @@ function determineBoundVariables(rootNode, binders = {}) {
 
     // Propogate down the tree
     if (rootNode.type === ABSTRACTION) {
-        determineBoundVariables(rootNode.body, newBinders)
+        findBoundVariables(rootNode.body, newBinders)
     }
 
     if (rootNode.type === APPLICATION) {
-        determineBoundVariables(rootNode.abstraction, newBinders)
-        determineBoundVariables(rootNode.argument, newBinders)
+        findBoundVariables(rootNode.abstraction, newBinders)
+        findBoundVariables(rootNode.argument, newBinders)
+    }
+}
+
+// Find which binders need to be alpha-converted
+function getBindersToRename(redex) {
+    const freeVariables = redex.argument.freeVariables
+    const boundName = redex.abstraction.formalParameter.name
+
+    const bindersToRenameList = (
+        Array.from(freeVariables)
+            .flatMap(
+                freeName => Array.from(getBindersWithName(
+                    redex.abstraction.body,
+                    freeName
+                )
+            ))
+    )
+
+    const bindersToRename = new Set(bindersToRenameList)
+
+    console.log("freeVariables", freeVariables, [...freeVariables])
+    console.log("mapped version", [...freeVariables].map(
+        freeName => getBindersWithName(redex.abstraction.body, freeName)
+    ))
+    console.log("bindersToRenameList", bindersToRenameList)
+
+    return bindersToRename
+
+    function getBindersWithName(rootNode, freeName) {
+        // Check to make sure boundName is in freeVariables before traversing
+        // This means we never check inside a binder that rebinds the variable
+        // (We could have done that check explicitly with
+        // rootNode.type === ABSTRACTION && rootNode.formalParameter === boundName
+        // but the advantage of instead doing THIS is that we prune the search tree
+        // much earlier
+        if (!rootNode.freeVariables.has(boundName)) {
+            return new Set()
+        }
+
+        if (rootNode.type === APPLICATION) {
+            return new Set([
+                ...getBindersWithName(rootNode.abstraction, freeName),
+                ...getBindersWithName(rootNode.argument, freeName)
+            ])
+        } else if (rootNode.type === ABSTRACTION) {
+            if (rootNode.formalParameter.name === freeName) {
+                return new Set([
+                    rootNode,
+                    ...getBindersWithName(rootNode.body, freeName) // since \x.\x.x is valid
+                ])
+            } else {
+                return getBindersWithName(rootNode.body, freeName)
+            }
+        } else {
+            return new Set()
+        }
     }
 }
 
@@ -269,7 +325,13 @@ function leftmostInnermost(rootNode) {
 
 function handleReduction(rootNode, redex, logEl) {
     // Determine if alpha conversion is needed first
-    if (rootNode.freeVariables.has())
+    const bindersToRename = getBindersToRename(redex)
+    console.log("Binders to rename:", bindersToRename)
+    
+    bindersToRename.forEach(
+        binder => binder.formalParameter.HTMLElement.style.color = "red"
+    )
+
     // Now, make a log of what the reduction was by cloning the current HTML structure
     // The `true` parameter means the cloning is deep
     console.log("Doing the appending now...")
@@ -301,12 +363,13 @@ function deepClone(rootNode) {
     if (rootNode === null) return;
 
     const newRootNode = {}
+    const doNotClone = ["HTMLElement", "freeVariables", "binders"]
 
     for (let key in rootNode) {
         // TODO: freeVariables doesn't need to be recomputed each time
         // (though it does need to be deep cloned in any case)
-        if (key === "HTMLElement" || key === "freeVariables") continue;
-
+        if (doNotClone.includes(key)) continue;
+        
         if (typeof rootNode[key] === 'object' && rootNode.hasOwnProperty(key)) {
             newRootNode[key] = deepClone(rootNode[key])
         } else {
