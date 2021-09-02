@@ -358,8 +358,12 @@ function getBindersToRename(redex) {
     }
 }
 
+function isBetaRedex(rootNode) {
+    return rootNode.type === APPLICATION && rootNode.abstraction.type === ABSTRACTION
+}
+
 function leftmostOutermost(rootNode) {
-    if (rootNode.type === APPLICATION && rootNode.abstraction.type === ABSTRACTION) {
+    if (isBetaRedex(rootNode)) {
         return rootNode
     }
 
@@ -369,7 +373,7 @@ function leftmostOutermost(rootNode) {
 }
 
 function leftmostInnermost(rootNode) {
-    if (rootNode.type === APPLICATION && rootNode.abstraction.type === ABSTRACTION) {
+    if (isBetaRedex(rootNode)) {
         return leftmostInnermost(rootNode.abstraction) || leftmostInnermost(rootNode.argument) || rootNode
     }
 
@@ -379,6 +383,8 @@ function leftmostInnermost(rootNode) {
 }
 
 function handleReduction(rootNode, redex, logEl, alphaElements) {
+    console.log("Fed with", rootNode, redex, logEl, alphaElements)
+
     // Determine if alpha conversion is needed first
     const bindersToRename = getBindersToRename(redex)
     console.log("Binders to rename:", bindersToRename)
@@ -714,29 +720,62 @@ function displayParseTree(ctx, rootNode, x, y, width) {
     rootNode.canvasRadius = outerRadius
 }
 
-function canvasMouse(x, y, rootNode) {
+let lastHighlightedRedex = null
+
+function findIntersection(node, ...args) {
+    const [x, y, cb] = args
+
     // TODO: in principle, we should know which half of the tree the relevant
     // node will be so only need to search O(log n) nodes rather than O(n) nodes
-    findIntersection(rootNode)
+    if (!node) return false;
 
+    if (x < node.canvasX + node.canvasRadius &&
+        x > node.canvasX - node.canvasRadius &&
+        y < node.canvasY + node.canvasRadius &&
+        y > node.canvasY - node.canvasRadius
+    ) {
+        console.log('Found')
+        cb(node)
+        return true
+    } else {
+        node.HTMLElement.classList.remove('highlighted')
+        
+        return findIntersection(node.body, ...args)
+            || findIntersection(node.abstraction, ...args)
+            || findIntersection(node.argument, ...args)
+            || findIntersection(node.formalParameter, ...args)
+    }
+}
 
-    function findIntersection(node) {
-        if (!node) return;
-
-        if (x < node.canvasX + node.canvasRadius &&
-            x > node.canvasX - node.canvasRadius &&
-            y < node.canvasY + node.canvasRadius &&
-            y > node.canvasY - node.canvasRadius
-        ) {
-            node.HTMLElement.classList.add('highlighted')
-            console.log("Found!")
+function canvasMouse(x, y, rootNode) {
+    const didFind = findIntersection(rootNode, x, y, node => {
+        if (isBetaRedex(node)) {
+            highlightRedex(lastHighlightedRedex = node)
         } else {
-            node.HTMLElement.classList.remove('highlighted')
-            
-            findIntersection(node.body)
-            findIntersection(node.abstraction)
-            findIntersection(node.argument)
-            findIntersection(node.formalParameter)
+            if (lastHighlightedRedex) {
+                unhighlightRedex(lastHighlightedRedex)
+                lastHighlightedRedex = null
+            }
+
+            node.HTMLElement.classList.add('highlighted')
+        }
+    })
+
+    if (!didFind) {
+        if (lastHighlightedRedex) {
+            unhighlightRedex(lastHighlightedRedex)
+            lastHighlightedRedex = null
         }
     }
+}
+
+function canvasClick(x, y, rootNode, logEl, alphaElements) {
+    findIntersection(rootNode, x, y, node => {
+        if (!isBetaRedex(node)) {
+            return;
+        }
+
+        handleReduction(rootNode, node, logEl, alphaElements)
+        lastHighlightedRedex = null
+    })
 }

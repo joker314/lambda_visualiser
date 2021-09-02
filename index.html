@@ -71,7 +71,6 @@
                 <input id="newName">
                 <button id="submitAlpha">&alpha;-convert</button>
             </div>
-            <button>Finish beta reduction</button>
         </div>
         <div id="htmlout"></div>
         <button id="no-eval">Normal order evaluate 1 step</button>
@@ -149,6 +148,13 @@
                 //ctx.fillRect(event.clientX - x, event.clientY - y, 20, 20)
 
                 canvasMouse(event.clientX - x, event.clientY - y, rootNode)
+            })
+
+            canvas.addEventListener("click", function handleMouseClick(event) {
+                if (!rootNode) return;
+                const {x, y} = canvas.getBoundingClientRect()
+
+                canvasClick(event.clientX - x, event.clientY - y, rootNode, logEl, alphaElements)
             })
 
             NOButton.addEventListener("mouseover", () => { highlightRedex(NORedex) })
