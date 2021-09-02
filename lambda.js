@@ -7,6 +7,8 @@ const BASIC = {
 }
 
 const LAMBDA_CHAR = "\u03bb"
+const ALPHA_CHAR = "\u03b1"
+const RIGHT_ARROW_CHAR = "\u2192"
 
 const ABSTRACTION = Symbol("ABSTRACTION")
 const APPLICATION = Symbol("APPLICATION")
@@ -226,6 +228,8 @@ function findFreeVariables(rootNode) {
  * The best way forward appears to be to find all free instances of the variable being replaced, and then
  * collecting the binders of each of those variables into a Set structure. Then, each of the members of that
  * set can be iterated in turn.
+ *
+ * Perhaps the most annoying thing is that doing two alpha conversions at the same time is
  */
 function findBoundVariables(rootNode, binders = {}) {
     const newBinders = {...binders}
@@ -244,6 +248,57 @@ function findBoundVariables(rootNode, binders = {}) {
     if (rootNode.type === APPLICATION) {
         findBoundVariables(rootNode.abstraction, newBinders)
         findBoundVariables(rootNode.argument, newBinders)
+    }
+}
+
+/**
+ * For a given variable name `x`, finds all bound vars that are in scope for free `x`, i.e.
+ * the binders that would make an alpha conversion to the bound variable illegal.
+ *
+ * XXX: This was quite hard to write. I was hoping the definition could come from
+ *      freeVariables and binders alone
+ *
+ * TODO: This was poorly thought out. It is confusing to first gather the binders that need to be renamed,
+ *       and only then to determine what valid renamings are possible. Both should be done in one step to keep
+ *       things clean.
+ *
+ * XXX: To summarise, the alpha conversion algorithm as it currently is, is:
+ *        - find all binders which shadow a free variable in the argument to the redex
+ *        - for each one, find all the variables tied to that binder
+ *        - for each variable, find the binders in scope
+ */
+function findVariablesInScope(binder) {
+    const freeVar = binder.formalParameter.name
+    return [...getScopes(binder.body)]
+
+    function getScopes(node) {
+        if (node.type === ABSTRACTION) {
+            // This abstraction rebinds the variable, so we don't need to worry
+            // about it.
+            if (node.formalParameter.name === freeVar) {
+                return new Set()
+            }
+
+            return getScopes(node.body)
+        } else if (node.type === APPLICATION) {
+            return setUnion(
+                getScopes(node.abstraction),
+                getScopes(node.argument)
+            )
+        } else if (node.name === freeVar) {
+            // Determine which variables are in scope
+            const varsInScope = new Set();
+
+            for (let varName in node.binders) {
+                if (node.binders[varName] !== binder.binders[varName]) {
+                    varsInScope.add(varName)
+                }
+            }
+
+            return varsInScope
+        } else {
+            return new Set()
+        }
     }
 }
 
@@ -270,7 +325,7 @@ function getBindersToRename(redex) {
     ))
     console.log("bindersToRenameList", bindersToRenameList)
 
-    return bindersToRename
+    return [...bindersToRename]
 
     function getBindersWithName(rootNode, freeName) {
         // Check to make sure boundName is in freeVariables before traversing
@@ -323,40 +378,116 @@ function leftmostInnermost(rootNode) {
     return null;
 }
 
-function handleReduction(rootNode, redex, logEl) {
+function handleReduction(rootNode, redex, logEl, alphaElements) {
     // Determine if alpha conversion is needed first
     const bindersToRename = getBindersToRename(redex)
     console.log("Binders to rename:", bindersToRename)
     
+    displayNextAlpha(0)
+    
+    // XXX: converts a loop into tail recursion through event listeners
+    function displayNextAlpha(i) {
+        if (i === bindersToRename.length) {
+            alphaElements.box.style.display = 'none'
+            console.log("Doing the appending now...")
+            const historyEl = document.createElement("DIV")
+            historyEl.appendChild(rootNode.HTMLElement.cloneNode(true))
+            logEl.appendChild(historyEl)
+
+            // Unhighlight the pre-reduction appearance of the redex
+            unhighlightRedex(redex)
+
+            // Perform the actual beta reduction!
+            const reductionResult = betaReduce(redex)
+
+            // Clear the old redex object and add the new one (TODO: this is hacky - this trick allows us
+            // to have all references to the redex now point to the reduction result -- it would be better
+            // to instead update all the references and create a new object)
+            for (let key in redex) {
+                delete redex[key]
+            }
+
+            Object.assign(redex, reductionResult)
+
+            // Finally, re-render the tree and simplified output
+            render(rootNode)
+            // redex.HTMLElement.classList.add('highlighted')
+               
+        } else {
+            // XXX: originally, I missed that you also have to avoid capturing the free variables
+            // (not just make sure your own variables don't get captured)
+            // AND I additionally forgot that you need to not capture any of the other variables either...
+            const binder = bindersToRename[i]
+            const bannedVariables = [...new Set(
+                [
+                    ...findVariablesInScope(binder),
+                    ...binder.body.freeVariables,
+                    ...redex.argument.freeVariables
+                ]
+            )]
+
+            alphaElements.box.style.display = 'inline-block';
+            alphaElements.oldName.textContent = bindersToRename[i].formalParameter.name
+            alphaElements.bannedVariables.textContent = bannedVariables.join(', ')
+
+            redex.abstraction.HTMLElement.style.backgroundColor = 'lightgreen'
+            binder.formalParameter.HTMLElement.style.color = 'red'
+
+            alphaElements.submitAlpha.onclick = function () {
+                const newName = alphaElements.newName.value
+
+                if (newName === "" || bannedVariables.includes(newName)) {
+                    // Do nothing - the input was invalid
+                    return;
+                }
+
+                binder.formalParameter.HTMLElement.style.color = 'black'
+                substitute(binder.body, binder.formalParameter.name, { type: BASIC.VARIABLE, name: newName })
+                binder.formalParameter.name = newName
+
+                // Now that names have changed, we must
+                // research this branch
+                findFreeVariables(binder)
+                findBoundVariables(binder)
+
+                console.log("Submitting next alpha")
+                displayNextAlpha(i + 1)
+            }
+        }
+    }
+
+    /*
     bindersToRename.forEach(
-        binder => binder.formalParameter.HTMLElement.style.color = "red"
+        binder => alert("Rename " + binder.formalParameter.name + " but don't use " + findVariablesInScope(binder))
     )
+    */
+
+    //if (bindersToRename.length) {
+    //    alphaConvBox.classList.add('visible')
+
+        /*
+        alphaConvList.replaceWith(
+            ...bindersToRename.map(binder => {
+                const listEl = document.createElement('LI')
+                const varEl = document.createElement('SPAN')
+                const arrowEl = document.createElement('SPAN')
+                const inputEl = document.createElement('INPUT')
+
+                varEl.textContent = binder.formalParameter.name
+                arrowEl.innerHTML = `${RIGHT_ARROW_CHAR}<sup>${ALPHA_CHAR}</sup>`
+
+                inputEl.classList.add('invalid')
+
+                
+                // TODO: use .append over .appendChild everywhere, not just here
+                listEl.append(varEl, arrowEl, inputEl)
+            })
+        )
+        */
+    //}
 
     // Now, make a log of what the reduction was by cloning the current HTML structure
     // The `true` parameter means the cloning is deep
-    console.log("Doing the appending now...")
-    const historyEl = document.createElement("DIV")
-    historyEl.appendChild(rootNode.HTMLElement.cloneNode(true))
-    logEl.appendChild(historyEl)
-
-    // Unhighlight the pre-reduction appearance of the redex
-    unhighlightRedex(redex)
-
-    // Perform the actual beta reduction!
-    const reductionResult = betaReduce(redex)
-
-    // Clear the old redex object and add the new one (TODO: this is hacky - this trick allows us
-    // to have all references to the redex now point to the reduction result -- it would be better
-    // to instead update all the references and create a new object)
-    for (let key in redex) {
-        delete redex[key]
-    }
-
-    Object.assign(redex, reductionResult)
-
-    // Finally, re-render the tree and simplified output
-    render(rootNode)
-    // redex.HTMLElement.classList.add('highlighted')
 }
 
 function deepClone(rootNode) {
@@ -380,25 +511,25 @@ function deepClone(rootNode) {
     return newRootNode
 }
 
+function substitute(rootNode, name, replacement) {
+    if (rootNode.type === BASIC.VARIABLE && rootNode.name === name) {
+        return deepClone(replacement)
+    }
+
+    if (rootNode.type === APPLICATION) {
+        rootNode.abstraction = substitute(rootNode.abstraction, name, replacement)
+        rootNode.argument = substitute(rootNode.argument, name, replacement)
+    }
+
+    if (rootNode.type === ABSTRACTION) {
+        rootNode.body = substitute(rootNode.body, name, replacement)
+    }
+
+    return rootNode
+}
+
 function betaReduce(redex) {
     // TODO: consider keeping a reference to the parent instead, to more easily mutate the rootNode
-
-    function substitute(rootNode, name, replacement) {
-        if (rootNode.type === BASIC.VARIABLE && rootNode.name === name) {
-            return deepClone(replacement)
-        }
-
-        if (rootNode.type === APPLICATION) {
-            rootNode.abstraction = substitute(rootNode.abstraction, name, replacement)
-            rootNode.argument = substitute(rootNode.argument, name, replacement)
-        }
-
-        if (rootNode.type === ABSTRACTION) {
-            rootNode.body = substitute(rootNode.body, name, replacement)
-        }
-
-        return rootNode
-    }
 
     return substitute(redex.abstraction.body, redex.abstraction.formalParameter.name, redex.argument) 
 }
