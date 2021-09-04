@@ -3,7 +3,8 @@ const BASIC = {
     OPENING_BRACKET: Symbol("OPENING BRACKET"),
     CLOSING_BRACKET: Symbol("CLOSING BRACKET"),
     LAMBDA: Symbol("LAMBDA"),
-    DOT: Symbol("DOT")
+    DOT: Symbol("DOT"),
+    NUMBER: Symbol("NUMBER")
 }
 
 const LAMBDA_CHAR = "\u03bb"
@@ -68,6 +69,30 @@ function getBracketPairs(tokens) {
     return { openingToClosing, closingToOpening, endOfBlock }
 }
 
+function churchEncode(n) {
+    function churchEncodedBody(n) {
+        if (n === 0) {
+            return { type: BASIC.VARIABLE, name: "x" }
+        } else {
+            return {
+                type: APPLICATION,
+                abstraction: { type: BASIC.VARIABLE, name: "f" },
+                argument: churchEncodedBody(n - 1)
+            }
+        }
+    }
+
+    return {
+        type: ABSTRACTION,
+        formalParameter: { type: BASIC.VARIABLE, name: "f" },
+        body: {
+            type: ABSTRACTION,
+            formalParameter: { type: BASIC.VARIABLE, name: "x" },
+            body: churchEncodedBody(n)
+        }
+    }
+}
+
 function parseAll(tokens) {
     const { openingToClosing, closingToOpening, endOfBlock } = getBracketPairs(tokens)
     return parse(0, tokens.length)
@@ -83,6 +108,14 @@ function parseAll(tokens) {
             const token = tokens[i]
 
             switch (token.type) {
+                case BASIC.NUMBER:
+                    if (inLambda) {
+                        throw new Error(`Church numeral ${token.value} used as formal parameter`)
+                    }
+
+                    parsedTokens.push(churchEncode(token.value))
+                    break
+
                 case BASIC.OPENING_BRACKET:
                     parsedTokens.push(parse(i + 1, openingToClosing[i]))
                     i = openingToClosing[i]
@@ -620,8 +653,17 @@ function htmlify(rootNode) {
 
 function tokenize(str) {
     const tokens = []
+    let currentNumber = ""
 
     for (let i = 0; i < str.length; i++) {
+        if ("0" <= str[i] && str[i] <= "9") {
+            currentNumber += str[i]
+            continue
+        } else if (currentNumber) {
+            tokens.push({ type: BASIC.NUMBER, value: +currentNumber })
+            currentNumber = ""
+        }
+
         switch (str[i]) {
             case "\\":
             case LAMBDA_CHAR:
@@ -641,19 +683,30 @@ function tokenize(str) {
                 break
 
             default:
-                // Ignore whitespace, but treat everything else as a variable
+                // Ignore whitespace, detect numbers, but treat everything else as a variable
                 if (/\S/.test(str[i])) {
                     tokens.push({ type: BASIC.VARIABLE, name: str[i] })
                 }
-
         }
+    }
+
+    if (currentNumber) {
+        tokens.push({ type: BASIC.NUMBER, value: +currentNumber })
     }
 
     return tokens
 }
 
-function handleInput(str) {
-    return parseAll(tokenize(str))
+function handleInput(str, errMsg) {
+    const tokenized = tokenize(str)
+
+    try {
+        errMsg.textContent = ""
+        const parsed = parseAll(tokenized)
+        return parsed
+    } catch (e) {
+        errMsg.textContent = e.message
+    }
 }
 
 /**

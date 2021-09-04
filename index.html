@@ -55,10 +55,15 @@
             .visible {
                 display: block;
             }
+
+            #errMsg {
+                color: red;
+            }
         </style>
     </head>
     <body>
         <input oninput="removeChildren(logEl); newRootNode(this.value);" />
+        <div id="errMsg"></div>
         <div id="logEl"></div>
         <div id="alphaConv">
             <h3>Alpha conversion</h3>
@@ -86,6 +91,7 @@
             const NOButton = document.querySelector("#no-eval")
             const AOButton = document.querySelector("#ao-eval")
             const logEl = document.querySelector("#logEl")
+            const errMsg = document.querySelector("#errMsg")
 
             let rootNode = null
             let AORedex = null
@@ -108,7 +114,7 @@
             }
 
             function newRootNode(str) {
-                rootNode = handleInput(str)
+                rootNode = handleInput(str, errMsg)
                 render(rootNode)
             }
 
