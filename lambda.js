@@ -117,6 +117,10 @@ function parseAll(tokens) {
                     break
 
                 case BASIC.OPENING_BRACKET:
+                    if (inLambda) {
+                        throw new Error(`Opening bracket at ${i} is not a valid formal parameter`)
+                    }
+
                     parsedTokens.push(parse(i + 1, openingToClosing[i]))
                     i = openingToClosing[i]
                     break
